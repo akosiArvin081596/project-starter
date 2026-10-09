@@ -62,7 +62,7 @@ test: ## Fast tests (unit and integration), with TZ=UTC
 	@$(NOT_CONFIGURED)
 
 e2e: ## Playwright smoke and timezone tests (e2e/) against BASE_URL or APP_URL
-	@cd e2e && if [ ! -d node_modules/@playwright/test ]; then npm ci --no-audit --no-fund; fi && ./node_modules/.bin/playwright test $(E2E_ARGS)
+	@cd e2e && if [ ! -d node_modules/@playwright/test ]; then npm ci --no-audit --no-fund; fi && ./node_modules/.bin/playwright install $${CI:+--with-deps} chromium && ./node_modules/.bin/playwright test $(E2E_ARGS)
 
 # build must fill $(ARTIFACT_DIR) with exactly the release that gets deployed, including
 # whatever MIGRATE_CMD needs on the server (the pipeline adds ops/ itself). For example:

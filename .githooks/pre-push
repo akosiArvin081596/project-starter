@@ -25,13 +25,12 @@ run_target() {
   set -e
   if [ "$rc" -ne 0 ]; then
     last=$(grep -E '^make(\[[0-9]+\])?: \*\*\* ' "$log" | tail -n 1 || true)
+    # not configured only when make reports "Error 3" AND the recipe printed the text, so a
+    # real tool that exits 3 (pytest, pylint) is never mistaken for an unconfigured target
+    rc=1
     case "$last" in
-      *'Error 3') rc=3 ;;
+      *'Error 3') if grep -qF "$NOT_CONFIGURED_TEXT" "$log"; then rc=3; fi ;;
     esac
-    if [ "$rc" -ne 3 ] && grep -qF "$NOT_CONFIGURED_TEXT" "$log"; then
-      rc=3
-    fi
-    [ "$rc" -eq 3 ] || rc=1
   fi
   rm -f "$log"
   return "$rc"
