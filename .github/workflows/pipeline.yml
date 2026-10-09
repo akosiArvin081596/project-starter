@@ -1,0 +1,22 @@
+# Thin caller of the shared pipeline (managed by team-sync; never edit in a project).
+# Every push to main: build once, scan the artifact, deploy to staging and run E2E there,
+# run release-please, and deploy a new release to production after the owner approves.
+# Deploy jobs skip until STAGING_READY / PRODUCTION_READY are set; an unconfigured
+# Makefile skips the build. A failed run opens a main-red issue. Skipped in the template.
+name: pipeline
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  pipeline:
+    if: ${{ !github.event.repository.is_template }}
+    permissions:
+      contents: read
+      issues: write
+    uses: akosiArvin081596/dev-standards/.github/workflows/pipeline.yml@v1
+    secrets: inherit

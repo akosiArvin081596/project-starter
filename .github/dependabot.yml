@@ -1,0 +1,59 @@
+# Dependabot: weekly, grouped, with a 7-day cooldown on version updates.
+# Commit messages (and so PR titles) look like "chore(deps): bump ..." to pass the
+# Conventional Commits pr-title check. Its PRs go through /team:review-pr.
+# Dependabot runs get a read-only token and no Actions secrets; the workflows cope with that.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Etc/UTC"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      github-actions:
+        patterns: ["*"]
+    ignore:
+      # The reusable workflows' @v1 pin is managed by team-sync (/team:sync-standards).
+      - dependency-name: "akosiArvin081596/dev-standards"
+
+  # Playwright for the browser tests (e2e/ has its own package.json).
+  - package-ecosystem: "npm"
+    directory: "/e2e"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Etc/UTC"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    groups:
+      e2e:
+        patterns: ["*"]
+
+  # Stack placeholder: /team:new-project replaces this with the app's own ecosystem
+  # (for example npm, composer, pip, bundler, gomod, cargo, maven, gradle, nuget, mix, docker).
+  # - package-ecosystem: "<ecosystem>"
+  #   directory: "/"
+  #   schedule:
+  #     interval: "weekly"
+  #     day: "monday"
+  #     time: "05:00"
+  #     timezone: "Etc/UTC"
+  #   cooldown:
+  #     default-days: 7
+  #   commit-message:
+  #     prefix: "chore"
+  #     include: "scope"
+  #   groups:
+  #     app:
+  #       patterns: ["*"]

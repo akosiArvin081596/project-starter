@@ -1,0 +1,26 @@
+# Thin caller of the shared rollback (managed by team-sync; never edit in a project).
+# The owner runs it by hand with a release tag (Actions → rollback → Run workflow). It waits
+# for the production environment's approval, then switches production to that release, or
+# rebuilds the tag and deploys it. See docs/runbooks/rollback.md. Skipped in the template.
+name: rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to put back on production, e.g. v0.3.1"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    if: ${{ !github.event.repository.is_template }}
+    permissions:
+      contents: read
+    uses: akosiArvin081596/dev-standards/.github/workflows/rollback.yml@v1
+    with:
+      tag: ${{ inputs.tag }}
+    secrets: inherit

@@ -1,0 +1,19 @@
+# Thin caller of the shared CI (managed by team-sync; never edit in a project).
+# Required check: "ci / ci". Skipped in the template repo, where template-ci runs instead.
+# No secrets: pull-request runs never get them.
+name: ci
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    if: ${{ !github.event.repository.is_template }}
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+    uses: akosiArvin081596/dev-standards/.github/workflows/ci.yml@v1

@@ -1,0 +1,21 @@
+# Thin caller of the shared PR gates (managed by team-sync; never edit in a project).
+# Required checks: "gates / guarded-paths" and "gates / pr-title". Always runs, also in the
+# template repo (profile "template"). No secrets: pull-request runs never get them.
+name: gates
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    uses: akosiArvin081596/dev-standards/.github/workflows/pr-gates.yml@v1
+    with:
+      profile: ${{ github.event.repository.is_template && 'template' || 'project' }}

@@ -1,0 +1,128 @@
+# Template-only CI: runs only while this repo is the template (is_template), and
+# `team-sync --init` deletes this file from every new project. Required check: "template-ci".
+# Checks: shellcheck on every shell file, the context check from dev-standards, every JSON
+# file parses, and .claude/settings.json / .mcp.json hold the pack's settings.
+# No paths: filters (a required workflow must always report).
+name: template-ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: template-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  template-ci:
+    name: template-ci
+    if: ${{ github.event.repository.is_template }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the template
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check out dev-standards v1 (context check scripts)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: akosiArvin081596/dev-standards
+          ref: v1
+          path: .team-standards
+          persist-credentials: false
+
+      - name: shellcheck every shell file
+        run: |
+          set -euo pipefail
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          fi
+          files=()
+          while IFS= read -r -d '' f; do
+            case "$f" in
+              *.sh) files+=("$f"); continue ;;
+            esac
+            first=$(head -n 1 -- "$f" 2>/dev/null || true)
+            if [[ "$first" =~ ^\#!.*(/|[[:space:]])(ba)?sh([[:space:]]|$) ]]; then
+              files+=("$f")
+            fi
+          done < <(git ls-files -z)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "::error::no shell files found (expected .githooks/*, ops/flag, .claude/hooks/*)"
+            exit 1
+          fi
+          printf 'shellcheck: %s\n' "${files[@]}"
+          shellcheck --version | head -n 2
+          shellcheck "${files[@]}"
+
+      - name: Context check
+        env:
+          TEAM_STANDARDS_DIR: ${{ github.workspace }}/.team-standards
+        run: bash "$TEAM_STANDARDS_DIR/scripts/ci/context-check.sh" --allow-unreleased-lock
+
+      - name: Every JSON file parses
+        run: |
+          set -euo pipefail
+          status=0
+          while IFS= read -r -d '' f; do
+            if jq empty "$f" 2>/dev/null; then
+              echo "ok   $f"
+            else
+              echo "::error file=$f::not valid JSON"
+              status=1
+            fi
+          done < <(git ls-files -z -- '*.json' '.claude/team-standards.lock')
+          exit "$status"
+
+      - name: Claude Code settings hold the pack's rules
+        run: |
+          set -euo pipefail
+          s=.claude/settings.json
+          status=0
+          check() {
+            local file="$1" description="$2" filter="$3"
+            if jq -e "$filter" "$file" >/dev/null 2>&1; then
+              echo "ok   $description"
+            else
+              echo "::error file=$file::$description"
+              status=1
+            fi
+          }
+          check "$s" "plugin team@dev-standards is enabled" \
+            '.enabledPlugins["team@dev-standards"] == true'
+          check "$s" "marketplace dev-standards is akosiArvin081596/dev-standards, pinned to ref v1" \
+            '.extraKnownMarketplaces["dev-standards"].source | (.source == "github" and .repo == "akosiArvin081596/dev-standards" and .ref == "v1")'
+          check "$s" "permissions.deny rules are present" \
+            '(.permissions.deny | type) == "array" and (.permissions.deny | length) > 0'
+          check "$s" "permissions.ask rules are present" \
+            '(.permissions.ask | type) == "array" and (.permissions.ask | length) > 0'
+          check "$s" "auto memory is off (autoMemoryEnabled: false)" \
+            '.autoMemoryEnabled == false'
+          check "$s" "the SessionStart plugin check is wired" \
+            '[.hooks.SessionStart[]?.hooks[]?.command // empty | select(test("plugin-check"))] | length > 0'
+          check .mcp.json "Playwright MCP is pinned to an exact version, isolated and headless" \
+            '.mcpServers.playwright.args | ([.[] | select(test("^@playwright/mcp@[0-9]+\\.[0-9]+\\.[0-9]+$"))] | length) == 1 and index("--isolated") != null and index("--headless") != null'
+          # defaultMode must never be set, in any committed Claude Code settings file
+          while IFS= read -r -d '' f; do
+            check "$f" "no defaultMode / permissions.defaultMode anywhere" \
+              '[.. | objects | select(has("defaultMode"))] | length == 0'
+          done < <(git ls-files -z -- '.claude/*.json' '.mcp.json')
+          if [ -x .claude/hooks/plugin-check ]; then
+            echo "ok   .claude/hooks/plugin-check is executable"
+          else
+            echo "::error file=.claude/hooks/plugin-check::missing or not executable"
+            status=1
+          fi
+          if git ls-files --error-unmatch .claude/settings.local.json >/dev/null 2>&1; then
+            echo "::error file=.claude/settings.local.json::local settings must never be committed"
+            status=1
+          else
+            echo "ok   .claude/settings.local.json is not committed"
+          fi
+          exit "$status"

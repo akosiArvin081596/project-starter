@@ -1,0 +1,23 @@
+# Thin caller of the shared uptime check (managed by team-sync; never edit in a project).
+# Every 15 minutes (UTC): two failed production health checks in a row open an incident
+# issue; recovery closes it. Skipped in the template. Scheduled runs also wait for
+# PRODUCTION_READY here, so unprovisioned projects don't start a runner every 15 minutes.
+# Public repos pause scheduled workflows after 60 days without activity (team-verify-repo warns).
+name: uptime
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  uptime:
+    if: ${{ !github.event.repository.is_template && (github.event_name != 'schedule' || vars.PRODUCTION_READY == 'true') }}
+    permissions:
+      contents: read
+      issues: write
+    uses: akosiArvin081596/dev-standards/.github/workflows/uptime.yml@v1
+    secrets: inherit
