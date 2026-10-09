@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# ops/flag <staging|production> <name> on|off
+# Switch a feature flag in one environment's feature_flags table, through the pack's
+# team-flag command (it connects to the server, so it asks for the owner's yes).
+# Production flags are switched by the owner only, from a normal terminal.
+# The registry of flags is docs/flags.md.
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: ops/flag <staging|production> <name> on|off
+
+Switches feature flag <name> on or off in one environment, via team-flag.
+Staging seeds every flag on; production defaults to off. Production is owner-only.
+
+Exit codes: 0 done, 2 usage error, 5 team-flag not found, other codes from team-flag.
+team-flag is found on PATH (inside Claude Code with the team plugin), or in TEAM_BIN
+(from the environment or ${TEAM_CONFIG_DIR:-$HOME/.config/team}/defaults.conf).
+EOF
+}
+
+case "${1:-}" in
+  -h|--help) usage; exit 0 ;;
+esac
+
+if [ "$#" -ne 3 ]; then
+  usage >&2
+  exit 2
+fi
+
+env_name="$1"
+flag_name="$2"
+state="$3"
+
+case "$env_name" in
+  staging|production) ;;
+  *) printf 'ops/flag: environment must be staging or production, got: %s\n' "$env_name" >&2; exit 2 ;;
+esac
+
+case "$state" in
+  on|off) ;;
+  *) printf 'ops/flag: state must be on or off, got: %s\n' "$state" >&2; exit 2 ;;
+esac
+
+# Same rule as team-flag: [a-z0-9][a-z0-9_-]{0,63}. The letters are listed one by one on
+# purpose: in bash 3.2 a glob range like [a-z] follows the locale's collation, and in UTF-8
+# locales it also matches upper-case letters.
+lower_digits='abcdefghijklmnopqrstuvwxyz0123456789'
+case "$flag_name" in
+  ["$lower_digits"]*) ;;
+  *) printf 'ops/flag: flag name must match [a-z0-9][a-z0-9_-]{0,63}: %s\n' "$flag_name" >&2; exit 2 ;;
+esac
+case "$flag_name" in
+  *[!"$lower_digits"_-]*) printf 'ops/flag: flag name must match [a-z0-9][a-z0-9_-]{0,63}: %s\n' "$flag_name" >&2; exit 2 ;;
+esac
+if [ "${#flag_name}" -gt 64 ]; then
+  printf 'ops/flag: flag name is longer than 64 characters\n' >&2
+  exit 2
+fi
+
+# TEAM_BIN from defaults.conf: parsed, never sourced. Last assignment wins; one pair of quotes stripped.
+if [ -z "${TEAM_BIN:-}" ]; then
+  conf="${TEAM_CONFIG_DIR:-$HOME/.config/team}/defaults.conf"
+  if [ -r "$conf" ]; then
+    TEAM_BIN=$(sed -n 's/^TEAM_BIN=//p' "$conf" | tail -n 1)
+    TEAM_BIN="${TEAM_BIN%\"}"; TEAM_BIN="${TEAM_BIN#\"}"
+    case "$TEAM_BIN" in \~/*) TEAM_BIN="$HOME/${TEAM_BIN#\~/}" ;; esac
+  fi
+fi
+# Inside Claude Code the plugin's own bin/ is already on PATH and must win; outside it, TEAM_BIN wins.
+if [ -n "${TEAM_BIN:-}" ]; then
+  if [ "${CLAUDECODE:-}" = "1" ]; then
+    PATH="$PATH:$TEAM_BIN"
+  else
+    PATH="$TEAM_BIN:$PATH"
+  fi
+  export PATH
+fi
+
+if ! command -v team-flag >/dev/null 2>&1; then
+  printf 'ops/flag: team-flag not found. Run inside Claude Code with the team plugin, or set TEAM_BIN in %s\n' \
+    "${TEAM_CONFIG_DIR:-$HOME/.config/team}/defaults.conf" >&2
+  exit 5
+fi
+
+exec team-flag "$env_name" "$flag_name" "$state"

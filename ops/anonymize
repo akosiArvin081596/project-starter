@@ -1,0 +1,40 @@
+# ops/anonymize: how the nightly snapshot turns production data into safe data.
+# The server applies these rules from production's current release, then checks that no
+# real-looking personal data is left, and refuses to store the dump otherwise.
+# Every column whose name looks personal needs a rule or an explicit ignore (the PII guard
+# in ci enforces this for new migrations).
+#
+# One directive per line, |-separated; lines starting with # are comments:
+#   rule|<table>|<column>|<strategy>[|<arg>]
+#   ignore|<table>|<column>|<reason>
+#   devlogin|<table>|<key column>|<key value>|<col>=<value>[;<col>=<value>]
+#
+# Strategies are deterministic (the same input always gets the same fake value, salted per
+# project on the server), so relations and unique keys still hold:
+#   email       u<10 hex>@example.invalid
+#   name, first_name, last_name, address
+#   phone       +1555<7 digits>
+#   text        fixed lorem ipsum
+#   null        NULL
+#   redact      <arg>, or REDACTED
+#   hash        hex digest
+# <table> may be * only in ignore lines. Fake emails may only use example.invalid,
+# example.com, example.org, example.net or *.test.
+#
+# devlogin keeps one known login working on sanitized copies: in the row where
+# <key column> = <key value>, it sets the listed columns (for example a known email and
+# the password hash your stack expects for the dev password).
+#
+# Example for a small customers table and a users table (replace with your schema):
+# rule|customers|full_name|name
+# rule|customers|email|email
+# rule|customers|phone|phone
+# rule|customers|address|address
+# rule|customers|birth_date|null
+# rule|customers|notes|text
+# rule|users|email|email
+# rule|users|remember_token|null
+# rule|payments|card_last4|redact|0000
+# ignore|customers|country_code|not personal on its own
+# ignore|*|created_at|timestamps are not personal
+# devlogin|users|id|1|email=dev@example.test;name=Dev Login
