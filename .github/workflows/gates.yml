@@ -16,6 +16,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
+      checks: read
     uses: akosiArvin081596/dev-standards/.github/workflows/pr-gates.yml@v1
     with:
       profile: ${{ github.event.repository.is_template && 'template' || 'project' }}

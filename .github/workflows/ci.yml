@@ -5,6 +5,8 @@ name: ci
 
 on:
   pull_request:
+    # labeled/unlabeled: adding `fixes-main` must re-run the stop-the-line check
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions:
   contents: read
