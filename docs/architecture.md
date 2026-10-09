@@ -56,3 +56,5 @@ checks it, and only that sanitized dump reaches worktrees (`make db-pull`) and s
 |---|---|---|
 | <mail provider or none> | <…> | local: log · staging: sandbox · production: live |
 | <payments or none> | <…> | local: sandbox · staging: sandbox · production: live |
+
+<!-- phase-4 template probe: closed without merging -->
