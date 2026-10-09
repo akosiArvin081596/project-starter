@@ -1,0 +1,30 @@
+# Env files: only the example is committed (worktree .env files hold ports, DB names, passwords)
+.env
+.env.*
+!.env.example
+
+# Database dumps and keys. Never a blanket *.sql: it would hide SQL migrations.
+*.dump
+*.sql.gz
+dumps/
+*.pem
+*.key
+
+# Local pack state: evidence screenshots, app pid/log, build artifact, Playwright profile and reports
+.team/
+.team-standards/
+node_modules/
+e2e/test-results/
+e2e/playwright-report/
+e2e/blob-report/
+.DS_Store
+
+# Claude Code: commit the shared files (re-included in case a global ignore hides them)
+!.claude/
+!.claude/settings.json
+!CLAUDE.md
+!.mcp.json
+
+# ...but never local settings or worktrees, anywhere (keep these last so they win)
+**/.claude/settings.local.json
+**/.claude/worktrees/

@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# pre-commit: (1) gitleaks scans the staged changes for secrets; (2) `make format-check`
+# runs when the project has filled it in. A target that isn't configured yet is skipped
+# with a notice. Installed by `make hooks` (team-hooks). bash 3.2 compatible.
+set -euo pipefail
+
+NOT_CONFIGURED_TEXT='not configured: fill in for your stack'
+
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+
+# run_target <target>: runs `make <target>`; returns 0 ok, 3 not configured, 1 failed.
+# GNU make exits 2 when a recipe exits 3, so read its "*** [...] Error 3" line and the
+# not-configured text instead of make's own exit code.
+run_target() {
+  local target="$1" log rc last
+  log=$(mktemp "${TMPDIR:-/tmp}/githook-make.XXXXXX")
+  set +e
+  make --no-print-directory "$target" 2>&1 | tee "$log"
+  rc=${PIPESTATUS[0]}
+  set -e
+  if [ "$rc" -ne 0 ]; then
+    last=$(grep -E '^make(\[[0-9]+\])?: \*\*\* ' "$log" | tail -n 1 || true)
+    case "$last" in
+      *'Error 3') rc=3 ;;
+    esac
+    if [ "$rc" -ne 3 ] && grep -qF "$NOT_CONFIGURED_TEXT" "$log"; then
+      rc=3
+    fi
+    [ "$rc" -eq 3 ] || rc=1
+  fi
+  rm -f "$log"
+  return "$rc"
+}
+
+# 1. Secrets in staged changes
+if command -v gitleaks >/dev/null 2>&1; then
+  if ! gitleaks git --pre-commit --staged --redact --no-banner .; then
+    echo "pre-commit: gitleaks found a possible secret in the staged changes (values redacted above)." >&2
+    echo "pre-commit: remove it from the change; never commit secrets, even to a branch." >&2
+    exit 1
+  fi
+else
+  echo "pre-commit: notice: gitleaks is not installed, so the local secret scan was skipped (CI still scans every PR)." >&2
+fi
+
+# 2. Formatting
+status=0
+run_target format-check || status=$?
+case "$status" in
+  0) ;;
+  3) echo "pre-commit: notice: make format-check is not configured yet; skipped." >&2 ;;
+  *) echo "pre-commit: make format-check failed; format the files and stage them again." >&2; exit 1 ;;
+esac
+
+exit 0

@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "@playwright/mcp@0.0.82",
+        "--isolated",
+        "--headless",
+        "--output-dir",
+        ".team/evidence"
+      ]
+    }
+  }
+}
