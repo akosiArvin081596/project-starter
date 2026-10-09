@@ -1,6 +1,6 @@
 {
   "standards_repo": "akosiArvin081596/dev-standards",
-  "release": "unreleased",
+  "release": "v1.0.0",
   "files": {
     ".claude/hooks/plugin-check": "sha256:65e1ff8a14ffffb45dbdc31a5266375038a15b5af53a3bca08eef1a8427ea373",
     ".claude/rules/team/team.md": "sha256:1d27a7444774942b5e4be45caff5e3eace6f766b7d9233e4a82ceaa986d5e4b5",
